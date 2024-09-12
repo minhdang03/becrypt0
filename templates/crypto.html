@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cập nhật chênh lệch giá thị trường</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-4 max-w-3xl">
+        <h1 class="text-4xl font-bold mb-8 text-center text-blue-600">Cập nhật chênh lệch giá thị trường</h1>
+        <div class="bg-white shadow-md rounded-lg p-6">
+            <p id="btc-price" class="text-lg text-gray-700 mb-4 p-4 bg-gray-100 rounded">Đang tải BTC/USDT...</p>
+            <p id="usdt-p2p-price" class="text-lg text-gray-700 mb-4 p-4 bg-gray-100 rounded">Đang tải USDT P2P...</p>
+            <p id="usd-price" class="text-lg text-gray-700 mb-4 p-4 bg-gray-100 rounded">Đang tải giá USD...</p>
+            <p id="price-difference" class="text-lg text-gray-700 mb-4 p-4 bg-gray-100 rounded">Đang tính chênh lệch giá...</p>
+            <button id="check-api" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4">Kiểm tra API</button>
+        </div>
+    </div>
+
+    <script>
+        let usdtP2PPrice = null;
+        let usdSellPrice = null;
+
+        function fetchBTCPrice() {
+            const symbol = 'BTCUSDT';
+            fetch(`/crypto/crypto-price?symbol=${symbol}`)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('btc-price').innerText = `BTC/USDT: ${data.price} USDT`;
+            })
+            .catch(error => console.error('Error fetching BTC price:', error));
+        }
+
+        function fetchUSDTP2PPrice() {
+            fetch('/api/usdt-p2p-price')
+            .then(response => response.json())
+            .then(data => {
+                if (data.price) {
+                    usdtP2PPrice = data.price;
+                    document.getElementById('usdt-p2p-price').innerText = `USDT P2P: ${data.price} VND`;
+                    calculatePriceDifference();
+                } else {
+                    document.getElementById('usdt-p2p-price').innerText = 'No data available';
+                }
+            })
+            .catch(error => console.error('Error fetching USDT P2P price:', error));
+        }
+
+        function fetchUSDPrice() {
+            fetch('/api/usd-price')
+            .then(response => response.json())
+            .then(data => {
+                if (data.price) {
+                    usdSellPrice = data.price;
+                    document.getElementById('usd-price').innerText = `USD Sell Price: ${data.price} VND`;
+                    calculatePriceDifference();
+                } else {
+                    document.getElementById('usd-price').innerText = 'No data available';
+                }
+            })
+            .catch(error => console.error('Error fetching USD price:', error));
+        }
+
+        function calculatePriceDifference() {
+            if (usdtP2PPrice !== null && usdSellPrice !== null) {
+                const difference = usdtP2PPrice - usdSellPrice;
+                const percentageDifference = ((difference / usdSellPrice) * 100).toFixed(2);
+                document.getElementById('price-difference').innerText = `Price Difference: ${difference} VND (${percentageDifference}%)`;
+            }
+        }
+
+        window.onload = function() {
+            fetchBTCPrice();
+            fetchUSDTP2PPrice();
+            fetchUSDPrice();
+        };
+
+        document.getElementById('check-api').addEventListener('click', function() {
+            fetch('/api/health-check')
+                .then(response => response.json())
+                .then(data => {
+                    alert(`Trạng thái API: ${data.status}\nThông báo: ${data.message}`);
+                })
+                .catch(error => {
+                    console.error('Lỗi khi kiểm tra API:', error);
+                    alert('Không thể kết nối đến API. Vui lòng kiểm tra console để biết thêm chi tiết.');
+                });
+        });
+    </script>
+</body>
+</html>
