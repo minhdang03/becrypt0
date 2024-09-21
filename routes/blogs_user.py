@@ -1,0 +1,177 @@
+from routes.blog_form import BlogForm
+from flask import Blueprint, request, jsonify, render_template, current_app, url_for, redirect, session, flash, send_from_directory
+from models.config import db
+from models.blogs import Blog
+from routes.category_form import CategoryForm
+from models.categories import Category
+from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_request
+from utils.decorators import role_required
+from werkzeug.utils import secure_filename  # Thay đổi import từ flask sang werkzeug
+import logging
+import os
+import bleach
+from html import unescape
+import uuid
+import re
+from flask_login import login_required
+
+
+def allowed_file(filename):
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+
+blogs_user_bp = Blueprint('blogs_user', __name__)
+
+@blogs_user_bp.route('/', methods=['GET', 'POST'], endpoint='blog_list')
+def blogs_list():
+    if request.method == 'POST':
+        # Xử lý POST request nếu cần
+        pass
+
+    # Truy vấn tất cả các danh mục từ cơ sở dữ liệu
+    categories = Category.query.all()
+
+    # Xử lý GET request
+    page = request.args.get('page', 1, type=int)
+    per_page = 10  # Số lượng blog mỗi trang
+    search = request.args.get('search', '', type=str)
+    category_id = request.args.get('category', None, type=int)
+
+    query = Blog.query
+    if search:
+        query = query.filter(Blog.title.ilike(f'%{search}%'))
+    if category_id:
+        query = query.filter(Blog.category_id == category_id)
+
+    blogs = query.paginate(page=page, per_page=per_page, error_out=False)
+    blogs_data = []
+    for blog in blogs.items:
+        blog_dict = blog.to_dict()
+        blog_dict['first_image_url'] = extract_first_image_url(blog.content)  # Lấy URL của hình ảnh đầu tiên
+        blogs_data.append(blog_dict)
+    
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.args.get('format') == 'json':
+        return jsonify(blogs=blogs_data, total=blogs.total, pages=blogs.pages, current_page=blogs.page), 200
+    else:
+        return render_template('blogs_user_list.html', categories=categories, blogs=blogs_data, pagination=blogs)
+
+
+
+
+@blogs_user_bp.route('/<int:blog_id>', methods=['GET'], endpoint='blog_details')
+def blog_details(blog_id):
+    blog = Blog.query.get_or_404(blog_id)
+    blog_dict = blog.to_dict()
+    blog_dict['first_image_url'] = extract_first_image_url(blog.content)  # Lấy URL của hình ảnh đầu tiên
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.args.get('format') == 'json':
+        return jsonify(blog=blog_dict), 200
+    else:
+        return render_template('blogs_user_details.html', blog=blog_dict)
+
+
+@blogs_user_bp.route('/new', methods=['GET', 'POST'])
+def blog_create():
+    form = BlogForm()
+    category_form = CategoryForm()
+    
+    if request.method == 'POST':
+        if form.validate_on_submit():
+            current_user_id = session.get('user_id')
+            # Giải mã HTML entities và làm sạch nội dung HTML
+            content = unescape(request.form.get('content'))
+            clean_content = bleach.clean(content, tags=['p', 'h1', 'h2', 'h3', 'br', 'strong', 'em', 'ul', 'ol', 'li', 'blockquote', 'img', 'a', 'span'], attributes={'img': ['src', 'alt'], 'a': ['href', 'title']})
+            
+            blog = Blog(
+                user_id=current_user_id,
+                title=form.title.data,
+                content=clean_content,
+                category_id=form.category_id.data # Thêm category_id vào đây
+            )
+            db.session.add(blog)
+            db.session.commit()
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify(message='Blog created successfully!', blog=blog.to_dict()), 201
+            else:
+                return redirect(url_for('blogs_user.blog_list'))
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify(errors=form.errors), 400
+    categories = Category.query.all()
+    return render_template('blogs_user_form.html', form=form, category_form=category_form)
+
+
+@blogs_user_bp.route('/edit/<int:blog_id>', methods=['GET', 'POST'])
+def blog_edit(blog_id):
+    blog = Blog.query.get_or_404(blog_id)
+    form = BlogForm(obj=blog)
+    category_form = CategoryForm()  # Thêm dòng này
+    
+    if request.method == 'POST' and form.validate_on_submit():
+        form.populate_obj(blog)
+        db.session.commit()
+        flash('Blog updated successfully!', 'success')
+        return redirect(url_for('blogs_user.blog_list'))
+    
+    categories = Category.query.all()
+    return render_template('blogs_user_form.html', form=form, blog=blog, categories=categories, category_form=category_form)
+
+
+@blogs_user_bp.route('/delete/<int:blog_id>', methods=['POST'])
+def blog_delete(blog_id):
+    if request.form.get('_method') == 'DELETE':
+        blog = Blog.query.get_or_404(blog_id)
+        db.session.delete(blog)
+        db.session.commit()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify(message='Blog deleted successfully!'), 200
+        else:
+            return redirect(url_for('blogs.blog_list'))
+    return jsonify(message='Method Not Allowed'), 405
+
+@blogs_user_bp.route('/user_blogs', methods=['GET'])
+def blog_user():
+    current_user_id = session.get('user_id')
+    if not current_user_id:
+        return jsonify(message='User not logged in'), 401
+    blogs = Blog.query.filter_by(user_id=current_user_id).all()
+    blogs_data = [blog.to_dict() for blog in blogs]
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify(blogs=blogs_data), 200
+    else:
+        return render_template('user_blogs.html', blogs=blogs_data)
+
+
+def extract_first_image_url(content):
+    match = re.search(r'<img.*?src=["\'](.*?)["\']', content)
+    return match.group(1) if match else None
+
+@blogs_user_bp.route('/user_upload_image', methods=['POST'])
+def upload_image():
+    if 'image' not in request.files:
+        return jsonify(error='No image file'), 400
+    file = request.files['image']
+    if file and allowed_file(file.filename):
+        filename = secure_filename(str(uuid.uuid4()) + os.path.splitext(file.filename)[1])
+        file_path = os.path.join(current_app.config['UPLOAD_IMG_FOLDER'], filename)
+        file.save(file_path)
+        image_url = url_for('static', filename=f'img/{filename}', _external=True)
+        return jsonify(url=image_url), 200
+    return jsonify(error='Invalid file type'), 400
+
+@blogs_user_bp.route('/featured', methods=['GET'])
+def featured_blogs():
+    featured = Blog.query.order_by(Blog.created_at.desc()).limit(6).all()
+    featured_data = []
+    for blog in featured:
+        blog_dict = blog.to_dict()
+        blog_dict['first_image_url'] = extract_first_image_url(blog.content)
+        featured_data.append(blog_dict)
+    
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.args.get('format') == 'json':
+        return jsonify(featured_blogs=featured_data), 200
+    else:
+        return render_template('index.html', featured_blogs=featured_data)

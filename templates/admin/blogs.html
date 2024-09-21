@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Quản lý Blogs{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="mb-4">Quản lý Blogs</h1>
+    <div class="row mb-3">
+        <div class="col-md-6 mb-2">
+            <a href="{{ url_for('blogs.blog_create') }}" class="btn btn-success">Thêm Blog Mới</a>
+        </div>
+        <div class="col-md-6">
+            <form method="GET" action="{{ url_for('blogs.blog_list') }}" class="form-inline">
+                <div class="input-group w-100">
+                    <input type="text" name="search" class="form-control" placeholder="Tìm kiếm...">
+                    <select name="category" class="form-control">
+                        <option value="">Tất cả danh mục</option>
+                        {% for category in categories %}
+                        <option value="{{ category.id }}">{{ category.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="input-group-append">
+                        <button type="submit" class="btn btn-primary">Lọc</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Tiêu đề</th>
+                    <th class="d-none d-md-table-cell">Danh mục</th>
+                    <th class="d-none d-md-table-cell">Tác giả</th>
+                    <th class="d-none d-lg-table-cell">Ngày tạo</th>
+                    <th>Trạng thái</th>
+                    <th>Yêu thích</th>
+                    <th>Hành động</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for blog in blogs %}
+                <tr>
+                    <td><a href="{{ url_for('blogs.blog_details', blog_id=blog['blog_id']) }}">{{ blog['title']|truncate(30) }}</a></td>
+                    <td class="d-none d-md-table-cell">{{ blog['category'] }}</td>
+                    <td class="d-none d-md-table-cell">{{ blog['author'] }}</td>
+                    <td class="d-none d-lg-table-cell">{{ blog['created_at'].strftime('%Y-%m-%d') }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('blogs.toggle_publish', blog_id=blog['blog_id']) }}" class="d-inline">
+                            <button type="submit" class="btn btn-sm {% if blog['is_published'] %}btn-success{% else %}btn-secondary{% endif %}">
+                                {% if blog['is_published'] %}Đã đăng{% else %}Chưa đăng{% endif %}
+                            </button>
+                        </form>
+                    </td>
+                    <td>
+                        <form method="POST" action="{{ url_for('blogs.toggle_favorite', blog_id=blog['blog_id']) }}" class="d-inline">
+                            <button type="submit" class="btn btn-sm {% if blog['is_favorite'] %}btn-warning{% else %}btn-outline-warning{% endif %}">
+                                <i class="fas fa-star"></i>
+                            </button>
+                        </form>
+                    </td>
+                    <td>
+                        <div class="d-flex flex-column flex-md-row">
+                            <a href="{{ url_for('blogs.blog_edit', blog_id=blog['blog_id']) }}" class="btn btn-primary btn-sm mb-1 mb-md-0 mr-md-1">
+                                <i class="fas fa-edit"></i> Sửa
+                            </a>
+                            <form method="POST" action="{{ url_for('blogs.blog_delete', blog_id=blog['blog_id']) }}" class="d-inline">
+                                <input type="hidden" name="_method" value="DELETE">
+                                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Bạn có chắc chắn muốn xóa bài viết này?');">
+                                    <i class="fas fa-trash-alt"></i> Xóa
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <nav aria-label="Page navigation">
+        <ul class="pagination justify-content-center">
+            <!-- Pagination code here -->
+        </ul>
+    </nav>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    @media (max-width: 767px) {
+        .table-responsive {
+            font-size: 0.9rem;
+        }
+        .btn-sm {
+            padding: 0.2rem 0.4rem;
+            font-size: 0.875rem;
+        }
+    }
+</style>
+{% endblock %}

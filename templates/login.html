@@ -1,0 +1,38 @@
+{% extends "layout.html" %}
+
+{% block title %}Đăng nhập{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden md:max-w-2xl mt-10">
+    <div class="p-8">
+        <h2 class="text-2xl font-semibold text-gray-700 mb-6">Đăng nhập</h2>
+        <form method="POST" action="{{ url_for('auth.login') }}" class="needs-validation" novalidate>
+            {{ form.hidden_tag() }}
+            <div class="mb-3">
+                {{ form.username.label(class="form-label") }}
+                {{ form.username(class="form-control", placeholder="Nhập tên đăng nhập") }}
+            </div>
+            <div class="mb-3">
+                {{ form.password.label(class="form-label") }}
+                {{ form.password(class="form-control", placeholder="Nhập mật khẩu") }}
+            </div>
+            <div class="mb-3 form-check">
+                {{ form.remember_me(class="form-check-input") }}
+                {{ form.remember_me.label(class="form-check-label") }}
+            </div>
+            {{ form.submit(class="btn btn-primary w-100") }}
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+<style>
+    .form-check-input {
+        width: 1rem;
+        height: 1rem;
+    }
+
+    .flex.items-center {
+        margin-left: 0.5rem;  /* Điều chỉnh giá trị này để căn chỉnh với các input khác */
+    }
+</style>

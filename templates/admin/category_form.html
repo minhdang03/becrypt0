@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Thêm Danh Mục Mới{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h2 class="mb-0"><i class="fas fa-plus-circle"></i> Thêm Danh Mục Mới</h2>
+        </div>
+        <div class="card-body">
+            <form method="POST">
+                {{ form.hidden_tag() }}
+                <div class="form-group">
+                    <label for="{{ form.name.id }}"><i class="fas fa-tag"></i> Tên danh mục</label>
+                    {{ form.name(class="form-control", placeholder="Nhập tên danh mục") }}
+                </div>
+                <div class="mt-4">
+                    {{ form.submit(class="btn btn-primary") }}
+                    <a href="{{ url_for('categories.category_list') }}" class="btn btn-secondary"><i class="fas fa-times"></i> Hủy</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

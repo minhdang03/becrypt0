@@ -1,0 +1,77 @@
+{% extends "layout.html" %}
+
+{% block title %}Trang chủ{% endblock %}
+
+{% block content %}
+
+<style>
+    /* Đảm bảo hình ảnh phủ kín khung hình */
+    .object-cover {
+        object-fit: cover;
+    }
+
+    /* Căn giữa hình ảnh theo chiều ngang */
+    .img-center {
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    /* Thêm viền cho hình ảnh */
+    .img-border {
+        border: 2px solid #ccc;
+        border-radius: 8px;
+    }
+
+    /* Căn đều văn bản */
+    .text-justify {
+        text-align: justify;
+    }
+</style>
+
+<div class="container mx-auto px-4 py-8">
+    {% include 'slideshow.html' %}
+
+    <!-- Featured blogs container -->
+    <div class="mb-12">
+        <h2 class="text-2xl font-semibold mb-6 text-gray-700">Bài viết tiêu biểu</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for blog in featured_blogs %}
+            <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                {% if blog.first_image_url %}
+                <div class="h-48 overflow-hidden">
+                    <img src="{{ blog.first_image_url }}" alt="{{ blog.title }}" class="w-full h-full object-cover">
+                </div>
+                {% endif %}
+                <div class="p-6">
+                    <h3 class="text-xl font-semibold mb-2">
+                        <a href="{{ url_for('blogs_user.blog_details', blog_id=blog.blog_id) }}" class="text-blue-600 hover:text-blue-800">{{ blog.title }}</a>
+                    </h3>
+                    <p class="text-gray-600 mb-4 text-justify">{{ blog.content|striptags|truncate(100) }}</p>
+                    <div class="flex justify-between items-center text-sm text-gray-500">
+                        <span>Tác giả: {{ blog.author }}</span>
+                        <span>{{ blog.created_at.strftime('%d/%m/%Y') }}</span>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <p class="text-gray-600 col-span-3">Hiện tại chưa có bài viết tiêu biểu nào.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- View all blogs button container -->
+    <div class="text-center">
+        <a href="{{ url_for('blogs_user.blog_list') }}" class="inline-block bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition duration-300">
+            Xem tất cả bài viết
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+    <!-- Slideshow script -->
+    <script>
+        // Đặt script của slideshow ở đây nếu cần
+    </script>
+{% endblock %}

@@ -1,0 +1,46 @@
+{% extends "layout.html" %}
+
+{% block title %}Hồ sơ của {{ current_user.fullname }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto mt-8 px-4">
+    <h1 class="text-3xl font-bold mb-6 text-gray-800">Hồ sơ của {{ current_user.fullname }}</h1>
+    
+    <div class="bg-white shadow-md rounded-lg p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <h2 class="text-xl font-semibold mb-4 text-gray-700">Thông tin cá nhân</h2>
+                <p class="mb-2"><strong>Tên đăng nhập:</strong> {{ current_user.username }}</p>
+                <p class="mb-2"><strong>Email:</strong> {{ current_user.email }}</p>
+                <p class="mb-2"><strong>Vai trò:</strong> {{ current_user.role.role_name }}</p>
+            </div>
+            <div>
+                <h2 class="text-xl font-semibold mb-4 text-gray-700">Hoạt động gần đây</h2>
+                <!-- Thêm thông tin về hoạt động gần đây của người dùng ở đây -->
+                <p class="text-gray-600">Chưa có hoạt động nào gần đây.</p>
+            </div>
+        </div>
+        
+        <div class="mt-8">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Các bài viết của bạn</h2>
+            {% if user_blogs %}
+                <ul class="space-y-4">
+                {% for blog in user_blogs %}
+                    <li class="border-b pb-2">
+                        <a href="{{ url_for('blogs.blog_edit', blog_id=blog.blog_id) }}" class="text-blue-600 hover:text-blue-800">{{ blog.title }}</a>
+                        <p class="text-sm text-gray-500">Đăng ngày: {{ blog.created_at.strftime('%d/%m/%Y') }}</p>
+                    </li>
+                {% endfor %}
+                </ul>
+                {% if user_blogs|length == 5 %}
+                    <a href="{{ url_for('blogs_user.blog_user') }}" class="mt-4 inline-block text-blue-600 hover:text-blue-800">Xem tất cả bài viết</a>
+                {% endif %}
+            {% else %}
+                <p class="text-gray-600">Bạn chưa có bài viết nào.</p>
+            {% endif %}
+        </div>
+        
+
+    </div>
+</div>
+{% endblock %}

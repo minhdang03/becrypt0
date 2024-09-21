@@ -1,7 +1,24 @@
-from flask import Blueprint, jsonify, request, render_template, Flask
-import requests
+from routes.blog_form import BlogForm
+from flask import Blueprint, request, jsonify, render_template, current_app, url_for, redirect, session, flash, send_from_directory
+from models.config import db
+from models.blogs import Blog
+from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_request
+from utils.decorators import role_required
+from werkzeug.utils import secure_filename  # Thay đổi import từ flask sang werkzeug
+import logging
+import os
+import bleach
+from html import unescape
+import uuid
+
 
 crypto_bp = Blueprint('crypto', __name__)
+
+API_KEY = 'YOUR_API_KEY'
+SECRET_KEY = 'YOUR_SECRET_KEY'
+
+def get_signature(query_string):
+    return hmac.new(SECRET_KEY.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()
 
 def get_crypto_price(symbol):
     url = f'https://api.binance.com/api/v3/ticker/price?symbol={symbol}'
@@ -10,39 +27,35 @@ def get_crypto_price(symbol):
         response.raise_for_status()
         data = response.json()
         return float(data['price'])
-    except requests.exceptions.HTTPError as http_err:
-        print(f"HTTP error occurred: {http_err}")
-    except Exception as err:
-        print(f"Other error occurred: {err}")
-    return None
+    except Exception as e:
+        print(f"Error fetching crypto price: {e}")
+        return None
 
 def get_usdt_p2p_price(fiat, trans_amount):
     url = 'https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search'
     payload = {
         "asset": "USDT",
         "fiat": fiat,
-        "transAmount": trans_amount,
-        "tradeType": "BUY",
+        "merchantCheck": True,
         "page": 1,
-        "rows": 1,
-        "payTypes": []
+        "rows": 10,
+        "tradeType": "BUY",
+        "transAmount": trans_amount
     }
-    
+    headers = {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0'
+    }
     try:
-        response = requests.post(url, json=payload)
+        response = requests.post(url, json=payload, headers=headers)
         response.raise_for_status()
         data = response.json()
         if 'data' in data and data['data']:
-            price = float(data['data'][0]['adv']['price'])
-            return round(price)
-        else:
-            print("No data available")
-            return None
-    except requests.exceptions.HTTPError as http_err:
-        print(f"HTTP error occurred: {http_err}")
-    except Exception as err:
-        print(f"Other error occurred: {err}")
-    return None
+            return float(data['data'][0]['adv']['price'])
+        return None
+    except Exception as e:
+        print(f"Error fetching USDT P2P price: {e}")
+        return None
 
 @crypto_bp.route('/')
 @crypto_bp.route('/crypto')
@@ -58,10 +71,11 @@ def crypto_price():
     else:
         return jsonify({"error": "Không thể lấy giá"}), 500
 
-
 @crypto_bp.route('/usdt-p2p-price')
 def get_usdt_p2p_price_route():
-    price = get_usdt_p2p_price('VND', '20000000')
+    fiat = request.args.get('fiat', 'VND')
+    trans_amount = request.args.get('transAmount', '20000000')
+    price = get_usdt_p2p_price(fiat, trans_amount)
     if price is not None:
         return jsonify({"price": price})
     else:
@@ -72,5 +86,3 @@ def get_usd_price_route():
     # Implement the logic to fetch USD price from Vietcombank here
     # Return the price as JSON
     pass
-
-

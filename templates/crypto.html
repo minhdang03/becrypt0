@@ -14,7 +14,6 @@
             <p id="usdt-p2p-price" class="text-lg text-gray-700 mb-4 p-4 bg-gray-100 rounded">Đang tải USDT P2P...</p>
             <p id="usd-price" class="text-lg text-gray-700 mb-4 p-4 bg-gray-100 rounded">Đang tải giá USD...</p>
             <p id="price-difference" class="text-lg text-gray-700 mb-4 p-4 bg-gray-100 rounded">Đang tính chênh lệch giá...</p>
-            <button id="check-api" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4">Kiểm tra API</button>
         </div>
     </div>
 
@@ -76,17 +75,6 @@
             fetchUSDPrice();
         };
 
-        document.getElementById('check-api').addEventListener('click', function() {
-            fetch('/api/health-check')
-                .then(response => response.json())
-                .then(data => {
-                    alert(`Trạng thái API: ${data.status}\nThông báo: ${data.message}`);
-                })
-                .catch(error => {
-                    console.error('Lỗi khi kiểm tra API:', error);
-                    alert('Không thể kết nối đến API. Vui lòng kiểm tra console để biết thêm chi tiết.');
-                });
-        });
     </script>
 </body>
 </html>
