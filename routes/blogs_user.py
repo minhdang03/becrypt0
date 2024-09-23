@@ -4,6 +4,7 @@ from models.config import db
 from models.blogs import Blog
 from routes.category_form import CategoryForm
 from models.categories import Category
+from models.blog_images_model import BlogImage
 from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_request
 from utils.decorators import role_required
 from werkzeug.utils import secure_filename  # Thay đổi import từ flask sang werkzeug
@@ -14,12 +15,34 @@ from html import unescape
 import uuid
 import re
 from flask_login import login_required
+from bs4 import BeautifulSoup
+from apscheduler.schedulers.background import BackgroundScheduler
+import atexit
 
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
 def allowed_file(filename):
-    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def delete_temp_images():
+    temp_folder = os.path.join(current_app.static_folder, 'img', 'blogs', 'temp')
+    for filename in os.listdir(temp_folder):
+        file_path = os.path.join(temp_folder, filename)
+        try:
+            if os.path.isfile(file_path):
+                os.unlink(file_path)
+        except Exception as e:
+            print(f"Error deleting file {file_path}: {e}")
+
+scheduler = BackgroundScheduler()
+scheduler.add_job(func=delete_temp_images, trigger="interval", minutes=60)
+scheduler.start()
+
+# Shut down the scheduler when exiting the app
+atexit.register(lambda: scheduler.shutdown())
+
+def get_image_url(relative_path):
+    return url_for('static', filename=relative_path, _external=True)
 
 
 blogs_user_bp = Blueprint('blogs_user', __name__)
@@ -66,6 +89,20 @@ def blog_details(blog_id):
     blog_dict = blog.to_dict()
     blog_dict['first_image_url'] = extract_first_image_url(blog.content)  # Lấy URL của hình ảnh đầu tiên
 
+    # Xử lý các đường dẫn hình ảnh trong nội dung blog
+    soup = BeautifulSoup(blog.content, 'html.parser')
+    for img in soup.find_all('img'):
+        src = img.get('src')
+        if not src.startswith('http'):
+            # Loại bỏ phần tiền tố dư thừa nếu có
+            if src.startswith('/blogs_user/'):
+                src = src[len('/blogs_user/'):]
+            # Thêm tiền tố /static/img/blogs nếu thiếu
+            if not src.startswith('static/img/blogs/'):
+                src = f"static/img/blogs/{src.lstrip('/')}"
+            img['src'] = f"{os.getenv('DOMAIN')}/{src.lstrip('/')}"
+    blog_dict['content'] = str(soup)
+
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.args.get('format') == 'json':
         return jsonify(blog=blog_dict), 200
     else:
@@ -80,7 +117,6 @@ def blog_create():
     if request.method == 'POST':
         if form.validate_on_submit():
             current_user_id = session.get('user_id')
-            # Giải mã HTML entities và làm sạch nội dung HTML
             content = unescape(request.form.get('content'))
             clean_content = bleach.clean(content, tags=['p', 'h1', 'h2', 'h3', 'br', 'strong', 'em', 'ul', 'ol', 'li', 'blockquote', 'img', 'a', 'span'], attributes={'img': ['src', 'alt'], 'a': ['href', 'title']})
             
@@ -88,9 +124,31 @@ def blog_create():
                 user_id=current_user_id,
                 title=form.title.data,
                 content=clean_content,
-                category_id=form.category_id.data # Thêm category_id vào đây
+                category_id=form.category_id.data
             )
             db.session.add(blog)
+            db.session.commit()
+            
+            # Lưu hình ảnh từ nội dung blog
+            soup = BeautifulSoup(clean_content, 'html.parser')
+            for img in soup.find_all('img'):
+                src = img.get('src')
+                if 'temp' in src:
+                    filename = os.path.basename(src)
+                    temp_path = os.path.join(current_app.static_folder, 'img', 'blogs', 'temp', filename)
+                    new_path = os.path.join(current_app.static_folder, 'img', 'blogs', filename)
+                    os.rename(temp_path, new_path)
+                    relative_path = f'static/img/blogs/{filename}'
+                    img['src'] = relative_path  # Lưu đường dẫn tương đối
+                    blog_image = BlogImage(blog_id=blog.blog_id, image_url=relative_path)
+                    db.session.add(blog_image)
+                else:
+                    # Đảm bảo rằng các đường dẫn hình ảnh có tiền tố 'static/img/blogs/'
+                    if not src.startswith('static/img/blogs/'):
+                        img['src'] = f'static/img/blogs/{src.lstrip("/")}'
+            
+            # Cập nhật lại nội dung blog với đường dẫn hình ảnh mới
+            blog.content = str(soup)
             db.session.commit()
             
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -100,32 +158,109 @@ def blog_create():
         
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify(errors=form.errors), 400
+
     categories = Category.query.all()
     return render_template('blogs_user_form.html', form=form, category_form=category_form)
 
+
+
+@blogs_user_bp.route('/user_upload_image', methods=['POST'])
+def upload_image():
+    if 'images' not in request.files:
+        return jsonify(error='No image files'), 400
+    
+    files = request.files.getlist('images')
+    if not files:
+        return jsonify(error='No image files'), 400
+    
+    image_urls = []
+    for file in files:
+        if file and allowed_file(file.filename):
+            try:
+                filename = secure_filename(str(uuid.uuid4()) + os.path.splitext(file.filename)[1])
+                file_path = os.path.join(current_app.static_folder, 'img', 'blogs', 'temp', filename)
+                
+                # Tạo thư mục nếu chưa tồn tại
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                
+                file.save(file_path)
+                image_url = url_for('static', filename=f'img/blogs/temp/{filename}', _external=True)
+                image_urls.append(image_url)
+            except Exception as e:
+                return jsonify(error=f'Failed to save file: {str(e)}'), 500
+        else:
+            return jsonify(error=f'Invalid file type: {file.filename}'), 400
+    
+    return jsonify(urls=image_urls), 200
+    
 
 @blogs_user_bp.route('/edit/<int:blog_id>', methods=['GET', 'POST'])
 def blog_edit(blog_id):
     blog = Blog.query.get_or_404(blog_id)
     form = BlogForm(obj=blog)
-    category_form = CategoryForm()  # Thêm dòng này
-    
-    if request.method == 'POST' and form.validate_on_submit():
-        form.populate_obj(blog)
-        db.session.commit()
-        flash('Blog updated successfully!', 'success')
-        return redirect(url_for('blogs_user.blog_list'))
-    
-    categories = Category.query.all()
-    return render_template('blogs_user_form.html', form=form, blog=blog, categories=categories, category_form=category_form)
+    category_form = CategoryForm()
 
+    if request.method == 'POST':
+        if form.validate_on_submit():
+            current_user_id = session.get('user_id')
+            content = unescape(request.form.get('content'))
+            clean_content = bleach.clean(content, tags=['p', 'h1', 'h2', 'h3', 'br', 'strong', 'em', 'ul', 'ol', 'li', 'blockquote', 'img', 'a', 'span'], attributes={'img': ['src', 'alt'], 'a': ['href', 'title']})
+            
+            blog.title = form.title.data
+            blog.content = clean_content
+            blog.category_id = form.category_id.data
+            
+            # Lưu hình ảnh từ nội dung blog
+            soup = BeautifulSoup(clean_content, 'html.parser')
+            for img in soup.find_all('img'):
+                src = img.get('src')
+                if 'temp' in src:
+                    filename = os.path.basename(src)
+                    temp_path = os.path.join(current_app.static_folder, 'img', 'blogs', 'temp', filename)
+                    new_path = os.path.join(current_app.static_folder, 'img', 'blogs', filename)
+                    os.rename(temp_path, new_path)
+                    relative_path = f'static/img/blogs/{filename}'
+                    img['src'] = relative_path  # Lưu đường dẫn tương đối
+                    blog_image = BlogImage(blog_id=blog.blog_id, image_url=relative_path)
+                    db.session.add(blog_image)
+                else:
+                    # Đảm bảo rằng các đường dẫn hình ảnh không có tiền tố dư thừa
+                    if src.startswith('/blogs_user/edit/'):
+                        src = src.replace('/blogs_user/edit/', '/')
+                    img['src'] = src
+            
+            # Cập nhật lại nội dung blog với đường dẫn hình ảnh mới
+            blog.content = str(soup)
+            db.session.commit()
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify(message='Blog updated successfully!', blog=blog.to_dict()), 200
+            else:
+                return redirect(url_for('blogs_user.blog_list'))
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify(errors=form.errors), 400
+
+    categories = Category.query.all()
+    return render_template('blogs_user_form.html', form=form, category_form=category_form, blog=blog)
 
 @blogs_user_bp.route('/delete/<int:blog_id>', methods=['POST'])
 def blog_delete(blog_id):
     if request.form.get('_method') == 'DELETE':
         blog = Blog.query.get_or_404(blog_id)
+        
+        # Tìm và xóa các hình ảnh liên quan từ cơ sở dữ liệu
+        blog_images = BlogImage.query.filter_by(blog_id=blog_id).all()
+        for blog_image in blog_images:
+            # Xóa tệp hình ảnh từ hệ thống tệp
+            image_path = os.path.join(current_app.static_folder, blog_image.image_url)
+            if os.path.exists(image_path):
+                os.remove(image_path)
+            db.session.delete(blog_image)
+        
         db.session.delete(blog)
         db.session.commit()
+        
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify(message='Blog deleted successfully!'), 200
         else:
@@ -146,21 +281,18 @@ def blog_user():
 
 
 def extract_first_image_url(content):
-    match = re.search(r'<img.*?src=["\'](.*?)["\']', content)
-    return match.group(1) if match else None
+    soup = BeautifulSoup(content, 'html.parser')
+    img = soup.find('img')
+    if img and 'src' in img.attrs:
+        src = img['src']
+        if not src.startswith('http'):
+            # Loại bỏ phần tiền tố dư thừa nếu có
+            if src.startswith('/blogs_user/'):
+                src = src[len('/blogs_user/'):]
+            src = f"{os.getenv('DOMAIN')}/{src.lstrip('/')}"
+        return src
+    return None
 
-@blogs_user_bp.route('/user_upload_image', methods=['POST'])
-def upload_image():
-    if 'image' not in request.files:
-        return jsonify(error='No image file'), 400
-    file = request.files['image']
-    if file and allowed_file(file.filename):
-        filename = secure_filename(str(uuid.uuid4()) + os.path.splitext(file.filename)[1])
-        file_path = os.path.join(current_app.config['UPLOAD_IMG_FOLDER'], filename)
-        file.save(file_path)
-        image_url = url_for('static', filename=f'img/{filename}', _external=True)
-        return jsonify(url=image_url), 200
-    return jsonify(error='Invalid file type'), 400
 
 @blogs_user_bp.route('/featured', methods=['GET'])
 def featured_blogs():
@@ -175,3 +307,9 @@ def featured_blogs():
         return jsonify(featured_blogs=featured_data), 200
     else:
         return render_template('index.html', featured_blogs=featured_data)
+
+@blogs_user_bp.route('/discard_blog', methods=['POST'])
+def discard_blog():
+    # Xóa các hình ảnh tạm thời khi người dùng hủy bỏ việc tạo blog
+    delete_temp_images()
+    return jsonify(message='Temporary images deleted'), 200

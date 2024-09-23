@@ -7,7 +7,7 @@
     <h1 class="mb-4">Quản lý Blogs</h1>
     <div class="row mb-3">
         <div class="col-md-6 mb-2">
-            <a href="{{ url_for('blogs.blog_create') }}" class="btn btn-success">Thêm Blog Mới</a>
+            
         </div>
         <div class="col-md-6">
             <form method="GET" action="{{ url_for('blogs.blog_list') }}" class="form-inline">
@@ -42,7 +42,7 @@
             <tbody>
                 {% for blog in blogs %}
                 <tr>
-                    <td><a href="{{ url_for('blogs.blog_details', blog_id=blog['blog_id']) }}">{{ blog['title']|truncate(30) }}</a></td>
+                    <td><a href="{{ url_for('blogs_user.blog_details', blog_id=blog['blog_id']) }}" target=”_blank>{{ blog['title']|truncate(30) }}</a></td>
                     <td class="d-none d-md-table-cell">{{ blog['category'] }}</td>
                     <td class="d-none d-md-table-cell">{{ blog['author'] }}</td>
                     <td class="d-none d-lg-table-cell">{{ blog['created_at'].strftime('%Y-%m-%d') }}</td>

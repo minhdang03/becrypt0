@@ -152,19 +152,12 @@ def extract_first_image_url(content):
     match = re.search(r'<img.*?src=["\'](.*?)["\']', content)
     return match.group(1) if match else None
 
-@blogs_bp.route('/upload_image', methods=['POST'])
-@role_required([1])  # Chỉ cho phép admin upload hình ảnh
-def upload_image():
-    if 'image' not in request.files:
-        return jsonify(error='No image file'), 400
-    file = request.files['image']
-    if file and allowed_file(file.filename):
-        filename = secure_filename(str(uuid.uuid4()) + os.path.splitext(file.filename)[1])
-        file_path = os.path.join(current_app.config['UPLOAD_IMG_FOLDER'], filename)
-        file.save(file_path)
-        image_url = url_for('static', filename=f'img/{filename}', _external=True)
-        return jsonify(url=image_url), 200
-    return jsonify(error='Invalid file type'), 400
+## @blogs_bp.route('/upload_image', methods=['POST'])
+## @role_required([1])  # Chỉ cho phép admin upload hình ảnh
+## def upload_image():
+ ##     if 'image' not in request.files:
+ ###### if relative_path:
+  ###  return jsonify(error='Invalid file type'), 400
 
 @blogs_bp.route('/toggle_publish/<int:blog_id>', methods=['POST'])
 @login_required

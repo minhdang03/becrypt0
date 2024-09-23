@@ -20,6 +20,7 @@ from flask_caching import Cache
 from routes.blogs import get_featured_blogs
 from routes.slideshow import slideshow_bp
 from routes.blogs_user import blogs_user_bp
+
 load_dotenv()
 
 def create_app():
@@ -27,8 +28,14 @@ def create_app():
     Bootstrap(app)
     app.static_folder = 'static'
     app.config['UPLOAD_IMG_FOLDER'] = os.path.join(app.root_path, 'static', 'img')
+    app.config['UPLOAD_BLOG_FOLDER'] = os.path.join(app.root_path, 'static', 'img', 'blogs')
     cache = Cache(app, config={'CACHE_TYPE': 'simple'})
-
+    DOMAIN = os.environ.get('DOMAIN', '127.0.0.1:9999')
+    def fix_image_urls(image_path):
+        if image_path.startswith('img/'):
+            return url_for('static', filename=image_path)
+        return image_path
+    app.jinja_env.filters['fix_image_urls'] = fix_image_urls
     # Cấu hình CORS
     CORS(app, resources={r"/*": {
         "origins": ["http://localhost:3000", "http://127.0.0.1:3000", 'https://imm0rtal.vercel.app', 'https://sinnhhatvuive.net'],
@@ -45,7 +52,6 @@ def create_app():
 
     # Khởi tạo cấu hình cơ sở dữ liệu
     init_app(app)
-
     # Cấu hình JWT
     app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'your_jwt_secret_key')
     jwt = JWTManager(app)
@@ -98,6 +104,10 @@ def create_app():
     @login_required
     def protected():
         return 'This is a protected page'
+    
+    @app.context_processor
+    def inject_domain():
+        return dict(domain=os.getenv('DOMAIN'))
     
     return app
 

@@ -10,17 +10,20 @@
     document.addEventListener('DOMContentLoaded', function() {
         const swiperWrapper = document.querySelector('.swiper-wrapper');
 
-        fetch('/slideshow/get_images')
+        fetch('/slideshow/get_random_image')
             .then(response => response.json())
             .then(data => {
+                if (data.error) {
+                    console.error('Lỗi khi tải ảnh slideshow:', data.error);
+                    return;
+                }
+
                 swiperWrapper.innerHTML = '';
                 
-                data.images.forEach(image => {
-                    const slide = document.createElement('div');
-                    slide.className = 'swiper-slide';
-                    slide.innerHTML = `<img src="{{ url_for('static', filename='img/slideshow/') }}${image}" alt="${image}" class="w-full h-full object-cover">`;
-                    swiperWrapper.appendChild(slide);
-                });
+                const slide = document.createElement('div');
+                slide.className = 'swiper-slide';
+                slide.innerHTML = `<img src="${data.url}" alt="${data.alt_text}" class="w-full h-full object-cover">`;
+                swiperWrapper.appendChild(slide);
 
                 new Swiper('.swiper-container', {
                     slidesPerView: 1,

@@ -100,6 +100,7 @@ def login():
         if user and check_password_hash(user.password, password):
             login_user(user, remember=remember_me)
             logger.info(f"User {username} authenticated successfully")
+            session['user_id'] = user.user_id
             session['username'] = user.username
             session['full_name'] = user.fullname
             session['role_id'] = user.role.role_id

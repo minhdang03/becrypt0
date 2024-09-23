@@ -1,40 +1,58 @@
-from flask import Blueprint, jsonify, render_template, request, current_app
+from flask import Blueprint, jsonify, render_template, request, current_app, url_for, flash, redirect
 import requests
-import os
-import re
-import hashlib
-from flask_login import login_required
 import os
 import re
 import random
 import math
+from flask_login import login_required
 from bs4 import BeautifulSoup
-
-
+from werkzeug.utils import secure_filename
+from models.slideshowimage import SlideshowImage
+from models.config import db
+from urllib.parse import urlparse, urlunparse
+from flask_sqlalchemy import SQLAlchemy
+from flask_wtf.csrf import CSRFProtect, generate_csrf
 
 slideshow_bp = Blueprint('slideshow', __name__)
 
-def get_existing_image_alts():
-    image_folder = os.path.join(current_app.static_folder, 'img', 'slideshow')
-    existing_images = [f for f in os.listdir(image_folder) if f.endswith(('.png', '.jpg', '.jpeg'))]
-    existing_alts = [re.sub(r'_[a-f0-9]{8}\.png$', '', f).replace('_', ' ') for f in existing_images]
-    return set(existing_alts)
+def get_image_folder():
+    return os.path.join(current_app.root_path, 'static', 'img', 'slideshow')
+
+def save_image(url, alt_text):
+    # Lưu đường dẫn hình ảnh vào cơ sở dữ liệu
+    new_image = SlideshowImage(url=url, alt_text=alt_text)
+    db.session.add(new_image)
+    db.session.commit()
+    return new_image.id
+
+def delete_image(image_name):
+    image_folder = get_image_folder()
+    filepath = os.path.join(image_folder, image_name)
+    if os.path.exists(filepath):
+        os.remove(filepath)
+        return True
+    return False
 
 def get_nasa_images():
     url = "https://science.nasa.gov/gallery/universe-images/"
     response = requests.get(url)
     soup = BeautifulSoup(response.content, 'html.parser')
     images = []
+    
+    # Get existing image URLs from the database
+    existing_images = {image.url for image in SlideshowImage.query.all()}
+    
     for img in soup.find_all('img'):
         src = img.get('src')
         alt = img.get('alt')
         if src and ('wp-content/uploads' in src or 'images.nasa.gov' in src):
             if not src.startswith('http'):
                 src = 'https://science.nasa.gov' + src
-            images.append({
-                'src': src,
-                'alt': alt or 'NASA Universe Image'
-            })
+            if src not in existing_images:
+                images.append({
+                    'src': src,
+                    'alt': alt or 'NASA Universe Image'
+                })
     return images
 
 @slideshow_bp.route('/random_images', methods=['GET'])
@@ -66,76 +84,54 @@ def get_random_images():
 @slideshow_bp.route('/manage_images')
 @login_required
 def manage_images():
-    image_folder = os.path.join(current_app.static_folder, 'img', 'slideshow')
-    all_images = [f for f in os.listdir(image_folder) if f.endswith(('.png', '.jpg', '.jpeg'))]
-    
-    # Xử lý phân trang
     page = request.args.get('page', 1, type=int)
     per_page = 5  # Số lượng hình ảnh mỗi trang
-    total_images = len(all_images)
-    total_pages = math.ceil(total_images / per_page)
     
-    start_index = (page - 1) * per_page
-    end_index = start_index + per_page
-    paginated_images = all_images[start_index:end_index]
+    images_query = SlideshowImage.query.paginate(page=page, per_page=per_page, error_out=False)
+    images = images_query.items
+    total_pages = images_query.pages
     
     return render_template('admin/imageNasa.html', 
-                           local_images=paginated_images, 
+                           images=images, 
                            current_page=page, 
                            total_pages=total_pages,
                            per_page=per_page)
 
-def create_unique_filename(alt_text):
-    # Xử lý alt text để tạo tên file hợp lệ
-    base_name = re.sub(r'[^\w\s-]', '', alt_text)
-    base_name = re.sub(r'[-\s]+', '_', base_name).strip('-_').lower()
-    
-    # Giới hạn độ dài tên file
-    base_name = base_name[:100]  # Có thể điều chỉnh độ dài tùy ý
-    
-    return f"{base_name}.png"
-
 @slideshow_bp.route('/save_images', methods=['POST'])
+@login_required
 def save_images():
     data = request.json
     image_data = data.get('images', [])
-    image_folder = os.path.join(current_app.static_folder, 'img', 'slideshow')
     
+    print(f"Received image data: {image_data}")  # Thêm câu lệnh in ra để kiểm tra
+
     saved_images = []
     for image in image_data:
         try:
-            url = image['src']
+            # Parse the URL and remove the query string
+            parsed_url = urlparse(image['src'])
+            clean_url = urlunparse(parsed_url._replace(query=''))
+            
             alt_text = image['alt']
-            response = requests.get(url)
-            if response.status_code == 200:
-                filename = create_unique_filename(alt_text)
-                filepath = os.path.join(image_folder, filename)
-                with open(filepath, 'wb') as f:
-                    f.write(response.content)
-                saved_images.append(filename)
+            image_id = save_image(clean_url, alt_text)
+            if image_id:
+                saved_images.append(image_id)
         except Exception as e:
-            print(f"Error saving image {url}: {e}")
+            print(f"Error saving image {image['src']}: {e}")
     
     return jsonify({
         'message': f'Đã lưu {len(saved_images)} hình ảnh thành công',
         'saved_images': saved_images
     })
-
-@slideshow_bp.route('/delete_image', methods=['POST'])
-def delete_image():
-    data = request.json
-    image_name = data.get('image')
-    image_folder = os.path.join(current_app.static_folder, 'img', 'slideshow')
     
-    if image_name:
-        image_path = os.path.join(image_folder, image_name)
-        if os.path.exists(image_path):
-            os.remove(image_path)
-            return jsonify({'message': 'Image deleted successfully'}), 200
-        else:
-            return jsonify({'error': 'Image not found'}), 404
-    else:
-        return jsonify({'error': 'No image name provided'}), 400
+@slideshow_bp.route('/delete_image/<int:image_id>', methods=['POST'])
+@login_required
+def delete_image(image_id):
+    image = SlideshowImage.query.get_or_404(image_id)
+    db.session.delete(image)
+    db.session.commit()
+    flash('Hình ảnh đã được xóa thành công.', 'success')
+    return redirect(url_for('slideshow.manage_images'))
 
 @slideshow_bp.route('/add_nasa_images', methods=['GET'])
 @login_required
@@ -147,25 +143,25 @@ def get_images():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 5, type=int)
     
-    image_folder = os.path.join(current_app.static_folder, 'img', 'slideshow')
-    all_images = [f for f in os.listdir(image_folder) if f.endswith(('.png', '.jpg', '.jpeg'))]
-    # Xáo trộn danh sách hình ảnh
-    random.shuffle(all_images)
-    
-    # Lấy 5 hình ảnh đầu tiên sau khi xáo trộn
-    selected_images = all_images[:5]
-
-    total_images = len(all_images)
-    total_pages = math.ceil(total_images / per_page)
-    
-    start_index = (page - 1) * per_page
-    end_index = start_index + per_page
-    paginated_images = all_images[start_index:end_index]
-    
-    print(f"Returning {len(paginated_images)} images for page {page}")  # Thêm log này
+    images_query = SlideshowImage.query.paginate(page=page, per_page=per_page, error_out=False)
+    images = images_query.items
+    total_pages = images_query.pages
     
     return jsonify({
-        'images': selected_images, 
+        'images': [{'url': image.url, 'alt_text': image.alt_text} for image in images],
         'total_pages': total_pages,
         'current_page': page
+    })
+
+@slideshow_bp.route('/get_random_image')
+def get_random_image():
+    images = SlideshowImage.query.all()
+    if not images:
+        return jsonify({'error': 'No images found'}), 404
+    
+    random_image = random.choice(images)
+    
+    return jsonify({
+        'url': random_image.url,
+        'alt_text': random_image.alt_text
     })

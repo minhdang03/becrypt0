@@ -12,11 +12,12 @@ class Blog(db.Model):
 
     user = db.relationship('User', backref='blogs')
     category_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=False)
-    # Xóa dòng này: category = db.relationship('Category', back_populates='blogs')
     
-    is_published = db.Column(db.Boolean, default=False)
+    is_published = db.Column(db.Boolean, default=True)
     is_favorite = db.Column(db.Boolean, default=False)
     
+    images = db.relationship('BlogImage', back_populates='blog', cascade='all, delete-orphan')
+
     def to_dict(self):
         return {
             'blog_id': self.blog_id,
@@ -28,5 +29,6 @@ class Blog(db.Model):
             'updated_at': self.updated_at,
             'category': self.category.name if self.category else None,
             'is_published': self.is_published,
-            'is_favorite': self.is_favorite  # Thêm dòng này
+            'is_favorite': self.is_favorite,
+            'images': [image.image_url for image in self.images]  # Thêm dòng này
         }

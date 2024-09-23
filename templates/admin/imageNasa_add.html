@@ -2,8 +2,11 @@
 
 {% block content %}
 <div class="container mt-5">
-    <h1 class="mb-4">Thêm hình ảnh từ NASA</h1>
-    
+    <h1 class="mb-4">
+        <a href="{{ url_for('slideshow.manage_images') }}" class="btn btn-primary">
+            Quản lý hình ảnh slideshow
+        </a>
+    </h1>
     <div class="table-responsive">
         <table class="table table-bordered table-hover">
             <thead class="thead-light">
@@ -38,6 +41,25 @@
 const imagesPerPage = 5;
 let currentPage = 1;
 let totalPages = 0;
+
+// Lấy CSRF token từ cookie
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            // Kiểm tra xem cookie có tên cần tìm không
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+const csrfToken = getCookie('csrf_token');
 
 function loadNasaImages(page) {
     fetch(`/slideshow/random_images?page=${page}&per_page=${imagesPerPage}`)
@@ -113,41 +135,22 @@ document.getElementById('save-images').addEventListener('click', () => {
         return;
     }
 
-    const progressContainer = document.getElementById('progress-container');
-    const progressBar = document.getElementById('progress-bar');
-    progressContainer.classList.remove('d-none');
-
     fetch('/slideshow/save_images', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken  // Thêm token CSRF vào header
         },
         body: JSON.stringify({ images: selectedImages }),
     })
     .then(response => response.json())
     .then(data => {
-        let savedCount = 0;
-        const totalImages = selectedImages.length;
-        
-        data.saved_images.forEach((saved, index) => {
-            setTimeout(() => {
-                savedCount++;
-                const progress = Math.round((savedCount / totalImages) * 100);
-                progressBar.style.width = `${progress}%`;
-                progressBar.setAttribute('aria-valuenow', progress);
-                progressBar.textContent = `${progress}%`;
-
-                if (savedCount === totalImages) {
-                    alert(data.message);
-                    window.location.href = '{{ url_for("slideshow.manage_images") }}';
-                }
-            }, index * 200); // Delay mỗi cập nhật 200ms để tạo hiệu ứng
-        });
+        alert(data.message);
+        window.location.href = '{{ url_for("slideshow.manage_images") }}';
     })
     .catch(error => {
         console.error('Error:', error);
         alert('Có lỗi xảy ra khi lưu hình ảnh');
-        progressContainer.classList.add('d-none');
     });
 });
 
