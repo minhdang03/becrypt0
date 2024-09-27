@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Layout Example</title>
+    <link href="/static/css/tailwind-output.css" rel="stylesheet">
+</head>
+<body class="flex flex-col min-h-screen">
+    <header class="bg-white shadow-md">
+        <nav class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <a href="#" class="text-2xl font-bold text-blue-600">Logo</a>
+                <div class="hidden md:flex space-x-4" id="desktop-menu">
+                    <a href="#" class="text-gray-700 hover:text-blue-600 transition duration-300">Trang chủ</a>
+                    <a href="#" class="text-gray-700 hover:text-blue-600 transition duration-300">Bài viết</a>
+                    <a href="#" class="text-gray-700 hover:text-blue-600 transition duration-300">Liên hệ</a>
+                </div>
+                <div class="md:hidden">
+                    <button id="menu-button" class="text-gray-700 focus:outline-none">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div id="mobile-menu" class="md:hidden mt-4 space-y-2 hidden">
+                <a href="#" class="block text-gray-700 hover:text-blue-600 transition duration-300">Trang chủ</a>
+                <a href="#" class="block text-gray-700 hover:text-blue-600 transition duration-300">Bài viết</a>
+                <a href="#" class="block text-gray-700 hover:text-blue-600 transition duration-300">Liên hệ</a>
+            </div>
+        </nav>
+    </header>
+
+    <main class="flex-grow container mx-auto px-4 py-8">
+        <h1 class="text-2xl font-bold mb-4">Nội dung chính</h1>
+        <p class="text-gray-700 mb-4">Đây là nơi để đặt nội dung chính của trang.</p>
+        
+        <!-- Thêm phần hiển thị hình ảnh -->
+        <div id="slideshow" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Hình ảnh sẽ được thêm vào đây bởi JavaScript -->
+        </div>
+    </main>
+
+    <footer class="bg-gray-200 py-4">
+        <div class="container mx-auto px-4 text-center text-gray-600">
+            <p>&copy; 2024 Tên công ty. Tất cả các quyền được bảo lưu.</p>
+        </div>
+    </footer>
+
+    <script>
+        document.getElementById('menu-button').addEventListener('click', function() {
+            var mobileMenu = document.getElementById('mobile-menu');
+            mobileMenu.classList.toggle('hidden');  // Thêm/xóa lớp hidden khi bấm nút
+        });
+
+        // Gọi API để lấy 3 hình ảnh ngẫu nhiên và hiển thị chúng
+        fetch('slideshow/get_background_image')
+            .then(response => response.json())
+            .then(data => {
+                const slideshow = document.getElementById('slideshow');
+                data.forEach(image => {
+                    const imgElement = document.createElement('img');
+                    imgElement.src = image.url;
+                    imgElement.alt = 'Slideshow Image';
+                    imgElement.className = 'w-full h-64 object-cover rounded-lg shadow-md';
+                    slideshow.appendChild(imgElement);
+                });
+            })
+            .catch(error => console.error('Error fetching images:', error));
+    </script>
+</body>
+</html>

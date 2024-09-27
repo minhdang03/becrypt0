@@ -8,58 +8,182 @@
         text-align: justify;
     }
     .blog-content p {
-        margin-bottom: 0%; /* Điều chỉnh khoảng cách giữa các thẻ <p> */
+        margin-bottom: 1em;
+    }
+    .blog-content img {
+        max-width: 100%;
+        height: auto;
+    }
+    .blog-content blockquote {
+        border-left: 5px solid #ccc;
+        margin: 1.5em 10px;
+        padding: 0.5em 10px;
+        color: #555;
+    }
+    .blog-content sup {
+        vertical-align: super;
+        font-size: 75%;
+        line-height: 0;
+        position: relative;
+        top: -0.5em;
+    }
+    .blog-content sub {
+        vertical-align: sub;
+        font-size: 75%;
+        line-height: 0;
+        position: relative;
+        bottom: -0.25em;
+    }
+    .blog-content h4 {
+        font-size: 1.5em;
+        margin-top: 1em;
+        margin-bottom: 0.5em;
+    }
+    .blog-content sup a {
+        color: #0000EE;
+        text-decoration: none;
+    }
+    .blog-content sup a:hover {
+        text-decoration: underline;
+    }
+    .blog-content ol {
+        list-style-type: decimal;
+        padding-left: 20px;
+    }
+    .blog-content ol li {
+        margin-bottom: 10px;
+    }
+    #firstimage {
+        background-position: center;
+        background-repeat: no-repeat;
+        height: 700px;
+        width: calc(100% - 20px); /* Adjust width to account for padding or margin */
+        position: sticky;
+        top: 50px;
+        z-index: 1;
+    }
+
+    #blogcontent {
+        background-color: white;
+        padding: 40px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        position: relative;
+        z-index: 2;
+    }
+
+    h1 {
+        font-size: 2.5rem;
+        font-weight: bold;
+        text-align: center;
+        color: #333;
+        margin-bottom: 1rem;
+        padding: 1rem;
+        background-color: rgba(255, 255, 255, 0.8);
+        border-radius: 5px;
+    }
+
+    .blog-container {
+        max-width: 800px;
+        margin: 0 auto;
+        position: relative;
+    }
+
+    @media (max-width: 768px) {
+        #firstimage {
+            background-position: center;
+            background-repeat: no-repeat;
+            height: 200px;
+            width: 100%; /* Adjust width to account for padding or margin */
+            position: sticky;
+            top: 50px;
+            z-index: 1;
+        }
+
+        #blogcontent {
+            margin-top: 20px;
+            padding: 20px;
+            display: block; /* Display blog content normally */
+        }
+
+        h1 {
+            position: static;
+            max-width: 100%;
+            margin-bottom: 20px;
+            display: block; /* Display image title normally */
+        }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container mx-auto mt-10">
-    {% include 'slideshow.html' %}
-    <div class="flex flex-col md:flex-row">
-        <div class="w-full md:w-3/3 md:pr-8">
-            <div class="bg-white p-8 rounded-lg shadow-md blog-content md:block hidden">
-                <h1 class="text-4xl font-bold mb-6 text-left text-gray-800">{{ blog.title }}</h1>
+<div class="container mx-auto mt-10 mb-10">
+    <div class="blog-container">
+        <!-- Image Section -->
+        <h1 class="text-5xl font-bold mb-6 text-left text-gray-800">{{ blog.title }}</h1>
+    
+        <div id="firstimage" class="w-full md:w-1/3 mt-8 md:mt-0" loading="lazy"></div>
+    
+        <!-- Blog Content Section -->
+        <div id="blogcontent" class="bg-white p-8 rounded-lg shadow-md ml-0 md:ml-10">
+            <div class="blog-content">
                 {{ blog.content | safe }}
-            </div>
-            <div class="blog-content md:hidden">
-                <h1 class="text-black">{{ blog.title }}</h1>
-                {{ blog.content | safe }}
-            </div>
-        </div>
-        <div class="w-full md:w-1/3 mt-8 md:mt-0">
-            <div class="bg-white p-6 rounded-lg shadow-md sticky top-4">
-                <p class="text-gray-600 mb-2">Tác giả: <b>{{ blog.author }}</b></p>
-                <p class="text-gray-600 mb-2">Danh mục: {{ blog.category }}</p>
-                <p class="text-gray-600 mb-2">Ngày tạo: {{ blog.created_at.strftime('%Y-%m-%d') }}</p>
-                {% if current_user.is_authenticated %}
-                    {% if current_user.id == blog.user_id or current_user.role_id == 1 %}
-                        <div class="mt-4">
-                            <a href="{{ url_for('blogs_user.blog_edit', blog_id=blog.blog_id) }}" class="block w-full bg-blue-500 text-white text-center py-2 rounded-lg hover:bg-blue-600 transition-colors">
-                                <i class="fas fa-edit"></i> Chỉnh sửa
-                            </a>
-                            {% if current_user.role_id == 1 %}
-                                <form method="POST" action="{{ url_for('blogs_user.blog_delete', blog_id=blog.blog_id) }}" class="mt-2">
-                                    <input type="hidden" name="_method" value="DELETE">
-                                    <button type="submit" class="block w-full bg-red-500 text-white text-center py-2 rounded-lg hover:bg-red-600 transition-colors">
-                                        <i class="fas fa-trash-alt"></i> Xóa
-                                    </button>
-                                </form>
-                            {% endif %}
-                        </div>
-                    {% endif %}
-                {% endif %}
             </div>
         </div>
     </div>
+    {% if current_user.is_authenticated and (current_user.id == blog.user_id or current_user.role_id == 1) %}
+    <div class="bg-white p-4 rounded-lg shadow-md top-4">
+        <div class="mt-4 flex justify-end space-x-2">
+            <a href="{{ url_for('blogs_user.blog_edit', blog_id=blog.blog_id) }}" 
+               class="inline-block px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors">
+                <i class="fas fa-edit"></i> Sửa
+            </a>
+            {% if current_user.role_id == 1 %}
+                <form method="POST" action="{{ url_for('blogs_user.blog_delete', blog_id=blog.blog_id) }}" class="inline">
+                    <input type="hidden" name="_method" value="DELETE">
+                    <button type="submit" 
+                            class="px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600 transition-colors">
+                        <i class="fas fa-trash-alt"></i> Xóa
+                    </button>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        var blogContent = document.getElementById("blogcontent");
+        if (blogContent.classList.contains("markdown-content")) {
+            blogContent.classList.remove("ml-16");
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        fetch('{{ url_for("slideshow.get_mot_image") }}')
+            .then(response => response.json())
+            .then(data => {
+                if (data.url) {
+                    document.getElementById('firstimage').style.backgroundImage = `url('${data.url}')`;
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    });
+
     document.addEventListener("DOMContentLoaded", function() {
         var images = document.querySelectorAll('.blog-content img');
         images.forEach(function(img) {
             img.classList.add('img-fluid');
         });
+    });
+
+    document.addEventListener("scroll", function() {
+        const scrollPos = window.scrollY;
+        const firstImage = document.getElementById("firstimage");
+
+        // Create a slight parallax effect when scrolling
+        firstImage.style.backgroundPositionY = `${scrollPos * 0.5}px`;
     });
 </script>
 {% endblock %}

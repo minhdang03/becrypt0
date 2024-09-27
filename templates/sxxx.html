@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quill with Custom Tooltip</title>
+
+    <!-- Include Quill.js from CDN -->
+    <link href="https://cdn.quilljs.com/1.3.6/quill.bubble.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tooltip.css') }}">
+</head>
+<body>
+
+    <div id="editor" style="height: 200px;"></div>
+    <button id="toolbar-button" class="tooltip-save-button">🛠️</button>
+
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/tooltip_module.js') }}"></script>
+</body>
+</html>

@@ -9,13 +9,12 @@ class Blog(db.Model):
     content = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp(), nullable=False)
     updated_at = db.Column(db.DateTime, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp(), nullable=False)
-
-    user = db.relationship('User', backref='blogs')
     category_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=False)
-    
     is_published = db.Column(db.Boolean, default=True)
     is_favorite = db.Column(db.Boolean, default=False)
-    
+    thumbnail_url = db.Column(db.String(255))  # Add this line
+
+    user = db.relationship('User', backref='blogs')
     images = db.relationship('BlogImage', back_populates='blog', cascade='all, delete-orphan')
 
     def to_dict(self):
@@ -30,5 +29,6 @@ class Blog(db.Model):
             'category': self.category.name if self.category else None,
             'is_published': self.is_published,
             'is_favorite': self.is_favorite,
-            'images': [image.image_url for image in self.images]  # Thêm dòng này
+            'thumbnail_url': self.thumbnail_url,  # Add this line
+            'images': [image.image_url for image in self.images]
         }

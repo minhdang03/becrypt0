@@ -18,8 +18,11 @@ from flask_login import login_required
 from bs4 import BeautifulSoup
 from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
+import shutil
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+
+logging.basicConfig(level=logging.DEBUG)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -82,7 +85,38 @@ def blogs_list():
 
 
 
+#@blogs_user_bp.route('/<int:blog_id>', methods=['GET'], endpoint='blog_details')
+# def blog_details(blog_id):
+    blog = Blog.query.get_or_404(blog_id)
+    blog_dict = blog.to_dict()
+    blog_dict['first_image_url'] = extract_first_image_url(blog.content)  # Lấy URL của hình ảnh đầu tiên
 
+    # Xử lý các đường dẫn hình ảnh trong nội dung blog
+    soup = BeautifulSoup(blog.content, 'html.parser')
+    images = soup.find_all('img')
+
+    if len(images) == 1:
+        # Nếu chỉ có một hình ảnh, loại bỏ thẻ <img>
+        images[0].decompose()
+    else:
+        for img in images:
+            src = img.get('src')
+            if not src.startswith('http'):
+                # Loại bỏ phần tiền tố dư thừa nếu có
+                if src.startswith('/blogs_user/'):
+                    src = src[len('/blogs_user/'):]
+                # Thêm tiền tố /static/img/blogs nếu thiếu
+                if not src.startswith('static/img/blogs/'):
+                    src = f"static/img/blogs/{src.lstrip('/')}"
+                img['src'] = f"{os.getenv('DOMAIN')}/{src.lstrip('/')}"
+
+    blog_dict['content'] = str(soup)
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.args.get('format') == 'json':
+        return jsonify(blog=blog_dict), 200
+    else:
+        return render_template('blogs_user_details.html', blog=blog_dict)
+    
 @blogs_user_bp.route('/<int:blog_id>', methods=['GET'], endpoint='blog_details')
 def blog_details(blog_id):
     blog = Blog.query.get_or_404(blog_id)
@@ -108,9 +142,10 @@ def blog_details(blog_id):
     else:
         return render_template('blogs_user_details.html', blog=blog_dict)
 
-
 @blogs_user_bp.route('/new', methods=['GET', 'POST'])
 def blog_create():
+    print("All form data:", request.form.to_dict())
+    print("Files:", request.files)
     form = BlogForm()
     category_form = CategoryForm()
     
@@ -119,15 +154,28 @@ def blog_create():
             current_user_id = session.get('user_id')
             content = unescape(request.form.get('content'))
             clean_content = bleach.clean(content, tags=['p', 'h1', 'h2', 'h3', 'br', 'strong', 'em', 'ul', 'ol', 'li', 'blockquote', 'img', 'a', 'span'], attributes={'img': ['src', 'alt'], 'a': ['href', 'title']})
-            
+            thumbnail_url = request.form.get('thumbnail_url')
+            print(f"Received thumbnail_url: {thumbnail_url}")  # Debug print
+           
+            # Move thumbnail image from temp to static/img/blogs/thumbnails
+            if thumbnail_url and 'temp' in thumbnail_url:
+                filename = os.path.basename(thumbnail_url)
+                temp_path = os.path.join(current_app.root_path, 'static/img/blogs/temp', filename)
+                new_path = os.path.join(current_app.root_path, 'static/img/blogs/thumbnails', filename)
+                shutil.move(temp_path, new_path)
+                thumbnail_url = f'static/img/blogs/thumbnails/{filename}'
+                print(f"Moved thumbnail to: {thumbnail_url}")  # Debug print
+
             blog = Blog(
                 user_id=current_user_id,
                 title=form.title.data,
                 content=clean_content,
-                category_id=form.category_id.data
+                category_id=form.category_id.data,
+                thumbnail_url=thumbnail_url
             )
             db.session.add(blog)
             db.session.commit()
+            print(f"Saved blog thumbnail_url: {blog.thumbnail_url}")  # Debug print
             
             # Lưu hình ảnh từ nội dung blog
             soup = BeautifulSoup(clean_content, 'html.parser')
@@ -147,20 +195,23 @@ def blog_create():
                     if not src.startswith('static/img/blogs/'):
                         img['src'] = f'static/img/blogs/{src.lstrip("/")}'
             
-            # Cập nhật lại nội dung blog với đường dẫn hình ảnh mới
+            # Update blog content with new image paths
             blog.content = str(soup)
-            db.session.commit()
-            
+            db.session.commit()            
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return jsonify(message='Blog created successfully!', blog=blog.to_dict()), 201
             else:
-                return redirect(url_for('blogs_user.blog_list'))
+                # Lấy URL của bài viết mới
+                blog_url = url_for('blogs_user.blog_details', blog_id=blog.blog_id)
+
+                # Chuyển hướng đến bài viết mới
+                return redirect(blog_url)
         
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify(errors=form.errors), 400
 
     categories = Category.query.all()
-    return render_template('blogs_user_form.html', form=form, category_form=category_form)
+    return render_template('blogs_user_forms.html', form=form, category_form=category_form)
 
 
 
@@ -192,7 +243,23 @@ def upload_image():
             return jsonify(error=f'Invalid file type: {file.filename}'), 400
     
     return jsonify(urls=image_urls), 200
-    
+
+@blogs_user_bp.route('/upload-thumbnailurl-temp', methods=['POST'])
+def upload_thumbnailurl_temp():
+    if 'thumbnail_url' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+
+    file = request.files['thumbnail_url']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+
+    if file:
+        filename = secure_filename(file.filename)
+        temp_path = os.path.join(current_app.static_folder, 'img', 'blogs', 'temp', filename)
+        file.save(temp_path)
+        return jsonify({'message': 'File uploaded successfully', 'filename': filename}), 200
+
+    return jsonify({'error': 'File upload failed'}), 500
 
 @blogs_user_bp.route('/edit/<int:blog_id>', methods=['GET', 'POST'])
 def blog_edit(blog_id):
@@ -204,7 +271,7 @@ def blog_edit(blog_id):
         if form.validate_on_submit():
             current_user_id = session.get('user_id')
             content = unescape(request.form.get('content'))
-            clean_content = bleach.clean(content, tags=['p', 'h1', 'h2', 'h3', 'br', 'strong', 'em', 'ul', 'ol', 'li', 'blockquote', 'img', 'a', 'span'], attributes={'img': ['src', 'alt'], 'a': ['href', 'title']})
+            clean_content = bleach.clean(content, tags=['p', 'h1', 'h2', 'h3', 'h4', 'sup', 'a', 'br', 'strong', 'em', 'ul', 'ol', 'li', 'blockquote', 'img', 'span'], attributes={'img': ['src', 'alt'], 'a': ['href', 'title']})
             
             blog.title = form.title.data
             blog.content = clean_content
@@ -264,7 +331,7 @@ def blog_delete(blog_id):
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify(message='Blog deleted successfully!'), 200
         else:
-            return redirect(url_for('blogs.blog_list'))
+            return redirect(url_for('blogs_user.blog_list'))
     return jsonify(message='Method Not Allowed'), 405
 
 @blogs_user_bp.route('/user_blogs', methods=['GET'])
@@ -306,10 +373,42 @@ def featured_blogs():
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.args.get('format') == 'json':
         return jsonify(featured_blogs=featured_data), 200
     else:
-        return render_template('index.html', featured_blogs=featured_data)
+        return render_template('featured.html', featured_blogs=featured_data)
 
 @blogs_user_bp.route('/discard_blog', methods=['POST'])
 def discard_blog():
     # Xóa các hình ảnh tạm thời khi người dùng hủy bỏ việc tạo blog
     delete_temp_images()
     return jsonify(message='Temporary images deleted'), 200
+
+@blogs_user_bp.route('/home', methods=['GET'])
+def home():
+    featured_blogs = Blog.query.order_by(Blog.created_at.desc()).limit(6).all()
+    featured_data = []
+    for blog in featured_blogs:
+        blog_dict = blog.to_dict()
+        blog_dict['image_url'] = extract_first_image_url(blog.content)
+        featured_data.append(blog_dict)
+    
+    recent_blogs = Blog.query.order_by(Blog.created_at.desc()).limit(4).all()
+    recent_data = []
+    for blog in recent_blogs:
+        blog_dict = blog.to_dict()
+        blog_dict['image_url'] = extract_first_image_url(blog.content)
+        recent_data.append(blog_dict)
+    
+    print("Featured blogs:", featured_data)  # Thêm log
+    print("Recent blogs:", recent_data)  # Thêm log
+    
+    return render_template('index.html', featured_blogs=featured_data, blogs=recent_data)
+
+@blogs_user_bp.route('/get_existing_images', methods=['GET'])
+def get_existing_images():
+    try:
+        # Truy vấn tất cả các hình ảnh từ cơ sở dữ liệu
+        images = BlogImage.query.all()
+        image_urls = [get_image_url(image.image_url) for image in images]
+        return jsonify(urls=image_urls), 200
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+    

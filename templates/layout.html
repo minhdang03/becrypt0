@@ -4,123 +4,43 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}My Website{% endblock %}</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
-    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/tailwind-output.css') }}" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/swiper/swiper-bundle.min.css" />
+    
     <style>
         html, body {
             height: 100%;
+            overflow-y: scroll; /* Luôn hiển thị thanh cuộn dọc */
+            font-family: 'Open Sans', sans-serif; /* Sử dụng font Open Sans */
         }
         body {
             display: flex;
             flex-direction: column;
-            background-color: transparent;
             margin: 0;
-        }
-        .swiper-container {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -1;
-        }
-        .swiper-slide img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        .overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(26, 26, 26, 0.5); /* Lớp phủ tối màu */
-            z-index: 0; /* Đặt z-index thấp hơn nội dung nhưng cao hơn slideshow */
-        }
-        .content-wrapper {
-            position: relative;
-            z-index: 10;
-            flex: 1 0 auto;
-            display: flex;
-            flex-direction: column;
-        }
-        .main-content {
-            flex: 1 0 auto;
-            background-color: transparent;
-            padding: 20px;
-            border-radius: 8px;
-        }
-        footer {
-            flex-shrink: 0;
-            background-color: #ffffff;
-            box-shadow: 0 -4px 6px rgba(0, 0, 0, 0.1);
-            padding: 1rem 0;
         }
     </style>
     {% block extra_css %}{% endblock %}
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
     <script src="https://unpkg.com/swiper/swiper-bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.min.js" defer></script>
+
 </head>
-<body class="flex flex-col min-h-screen">
-    <div class="overlay"></div> <!-- Lớp phủ tối màu -->
+<body class="flex flex-col min-h-screen bg-white md:bg-transparent" x-data="{ mobileMenuOpen: false }">
+    <header class="bg-white border-gray-200 dark:bg-gray-900 w-full relative z-50">
+        {% include 'navbar.html' %}
+    </header>
 
-    <div class="content-wrapper flex-grow">
-        <header class="bg-white shadow-md">
-            <div class="container-fluid px-4 py-4">
-                <nav class="navbar navbar-expand-md navbar-light bg-white fixed-top shadow">
-                    <a class="navbar-brand text-left text-2xl font-bold text-gray-800" href="{{ url_for('index') }}">imm0rtal</a>
-                    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                        <span class="navbar-toggler-icon"></span>
-                    </button>
-                    <div class="collapse navbar-collapse" id="navbarNav">
-                        <ul class="navbar-nav ml-auto">
-                            <li class="nav-item">
-                                <a class="nav-link text-lg font-semibold text-gray-700 hover:text-blue-600 transition-colors" href="{{ url_for('blogs_user.blog_list') }}">Bài viết</a>
-                            </li>
-                            {% if current_user.is_authenticated %}
-                                <li class="nav-item">
-                                    <a class="nav-link text-lg font-semibold text-gray-700 hover:text-yellow-300 transition-colors" href="{{ url_for('blogs_user.blog_create') }}">Viết bài mới</a>
-                                </li>
-                                <li class="nav-item dropdown">
-                                    <a class="nav-link dropdown-toggle text-lg font-semibold text-green-600" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                        {{ current_user.fullname }}
-                                    </a>
-                                    <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navbarDropdown">
-                                        {% if current_user.role_id == 1 %}
-                                            <a class="nav-link text-lg font-semibold text-gray-700 hover:text-blue-600 transition-colors" href="{{ url_for('admin.admin_dashboard') }}">Quản lý Admin</a>
-                                        {% endif %}
-                                        <a class="dropdown-item text-gray-700 hover:text-blue-600" href="{{ url_for('users.profile') }}">Hồ sơ</a>
-                                        <a class="dropdown-item text-gray-700 hover:text-blue-600" href="{{ url_for('auth.logout') }}">Đăng xuất</a>
-                                    </div>
-                                </li>
-                            {% else %}
-                                <li class="nav-item">
-                                    <a class="nav-link text-lg font-semibold text-gray-700 hover:text-blue-600 transition-colors" href="{{ url_for('auth.login') }}">Đăng nhập</a>
-                                </li>
-                                <!-- 
-                                <li class="nav-item">
-                                    <a class="nav-link text-lg font-semibold text-gray-700 hover:text-blue-600 transition-colors" href="{{ url_for('auth.register') }}">Đăng ký</a>
-                                </li>
-                                -->
-                            {% endif %}
-                        </ul>
-                    </div>
-                </nav>
-            </div>
-        </header>
-
-        <main class="main-content container pt-16 px-0 py-0 md:px-4 md:py-8">
+    <div class="content-wrapper flex-grow w-full">
+        <main class="main-content w-full p-4 sm:p-4 md:p-4 lg:p-4 xl:p-4">
             {% block content %}
             {% endblock %}
         </main>
 
-        <footer class="bg-white shadow-md py-4 mt-auto">
+        <footer class="bg-white shadow-md py-4 mt-auto w-full">
             <div class="container mx-auto px-4 text-center">
                 <p>&copy; 2024 imm0rtal. All rights reserved.</p>
             </div>

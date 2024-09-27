@@ -38,12 +38,19 @@ def blogs():
     per_page = 10  # Số lượng blog mỗi trang
     search = request.args.get('search', '', type=str)
     category_id = request.args.get('category', None, type=int)
+    order = request.args.get('order', 'desc', type=str)  # Thêm tham số order
 
     query = Blog.query
     if search:
         query = query.filter(Blog.title.ilike(f'%{search}%'))
     if category_id:
         query = query.filter(Blog.category_id == category_id)
+
+    # Sắp xếp theo thứ tự tăng dần hoặc giảm dần
+    if order == 'asc':
+        query = query.order_by(Blog.created_at.asc())
+    else:
+        query = query.order_by(Blog.created_at.desc())
 
     blogs = query.paginate(page=page, per_page=per_page, error_out=False)
     blogs_data = []
@@ -56,7 +63,6 @@ def blogs():
         return jsonify(blogs=blogs_data, total=blogs.total, pages=blogs.pages, current_page=blogs.page), 200
     else:
         return render_template('admin/blogs.html', categories=categories, blogs=blogs_data, pagination=blogs)
-
 
 
 

@@ -1,0 +1,15 @@
+.custom-tooltip {
+  position: absolute;
+  background-color: #f3f3f3;
+  border: 1px solid #ccc;
+  padding: 10px;
+  border-radius: 5px;
+  z-index: 1000;
+}
+
+.custom-tooltip button {
+  display: inline-block;
+  margin: 0 5px;
+  padding: 5px;
+  cursor: pointer;
+}

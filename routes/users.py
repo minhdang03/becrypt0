@@ -8,6 +8,7 @@ from flask_paginate import Pagination, get_page_parameter  # Đảm bảo nhập
 from flask_login import login_required
 from flask_login import current_user
 from models.blogs import Blog
+from sqlalchemy.orm import joinedload
 
 users_bp = Blueprint('users', __name__)
 logger = logging.getLogger(__name__)
@@ -100,8 +101,12 @@ def reset_password(user_id):
 
 @users_bp.route('/profile')
 @login_required
-@role_required([1,2,3])
+@role_required([1, 2, 3])
 def profile():
-    # Thay đổi current_user.id thành current_user.user_id
-    user_blogs = Blog.query.filter_by(user_id=current_user.user_id).order_by(Blog.created_at.desc()).limit(5).all()
-    return render_template('profile.html', user_blogs=user_blogs)
+    # Tải trước thuộc tính 'role' của current_user
+    user = db.session.query(User).options(joinedload(User.role)).filter_by(user_id=current_user.user_id).first()
+    
+    # Lấy các bài viết của người dùng
+    user_blogs = Blog.query.filter_by(user_id=user.user_id).order_by(Blog.created_at.desc()).limit(5).all()
+    
+    return render_template('profile.html', current_user=user, user_blogs=user_blogs)

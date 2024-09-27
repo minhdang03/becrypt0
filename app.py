@@ -1,4 +1,5 @@
-from flask import Flask, request, jsonify, render_template, redirect, url_for, flash, g
+import logging
+from flask import Flask, request, jsonify, render_template, redirect, url_for, flash, g, current_app
 from flask_cors import CORS
 from flask_session import Session
 from routes.crypto import crypto_bp
@@ -24,6 +25,7 @@ from routes.blogs_user import blogs_user_bp
 load_dotenv()
 
 def create_app():
+    
     app = Flask(__name__)
     Bootstrap(app)
     app.static_folder = 'static'
@@ -44,6 +46,11 @@ def create_app():
         "supports_credentials": True
     }})
 
+
+    # Configure logging
+    logging.basicConfig(level=logging.DEBUG)
+    logger = logging.getLogger(__name__)
+    
     # Cấu hình session
     app.config['SESSION_TYPE'] = 'filesystem'
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your_secret_key')
@@ -98,7 +105,10 @@ def create_app():
     @app.route('/about')
     def about():
         return render_template('about.html')
-
+    
+    @app.route('/test')
+    def test():
+        return render_template('test.html')
 
     @app.route('/protected')
     @login_required
@@ -109,9 +119,15 @@ def create_app():
     def inject_domain():
         return dict(domain=os.getenv('DOMAIN'))
     
+    @login_manager.user_loader
+    def load_user(user_id):
+        with current_app.app_context():
+            return db.session.get(User, int(user_id))
+
     return app
 
 app = create_app()
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=9999, debug=True)

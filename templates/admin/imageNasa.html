@@ -14,6 +14,7 @@
                 <tr>
                     <th style="width: 15%;">Hình ảnh</th>
                     <th>Tên</th>
+                    <th style="width: 10%;">Là hình ảnh đầu tiên</th> <!-- Thêm cột mới -->
                     <th style="width: 10%;">Hành động</th>
                 </tr>
             </thead>
@@ -24,6 +25,15 @@
                         <img src="{{ image.url }}" alt="{{ image.alt_text }}" class="img-fluid" style="max-height: 100px;">
                     </td>
                     <td class="align-middle">{{ image.alt_text }}</td>
+                    <td class="align-middle text-center">
+                        <button class="btn btn-sm {% if image.is_firstimageblogs %}btn-success{% else %}btn-secondary{% endif %}" onclick="toggleFirstImage({{ image.id }})">
+                            {% if image.is_firstimageblogs %}
+                                Có
+                            {% else %}
+                                Không
+                            {% endif %}
+                        </button>
+                    </td>
                     <td class="align-middle text-center">
                         <form action="{{ url_for('slideshow.delete_image', image_id=image.id) }}" method="post" style="display:inline;">
                             <button type="submit" class="btn btn-danger btn-sm">Xóa</button>
@@ -45,4 +55,27 @@
         </ul>
     </nav>
 </div>
+
+<script>
+function toggleFirstImage(imageId) {
+    fetch(`/slideshow/toggle_first_image/${imageId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Có lỗi xảy ra khi cập nhật hình ảnh.');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Có lỗi xảy ra khi cập nhật hình ảnh.');
+    });
+}
+</script>
 {% endblock %}

@@ -1,0 +1,151 @@
+{% extends "layout.html" %}
+
+{% block title %}Compose Blog{% endblock %}
+
+{% block content %}
+<div class="max-w-full sm:max-w-md md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto bg-white overflow-hidden">
+    <div name="form" class="p-2 sm:p-4 md:p-6 lg:p-8 xl:p-10 mx-4 sm:mx-8 md:mx-16 lg:mx-24 xl:mx-32">
+        <form method="POST" id="blog-form" action="{{ url_for('blogs_user.blog_create') }}" enctype="multipart/form-data">
+            {{ form.hidden_tag() }}
+            <div class="mb-4">
+                {{ form.title(class="appearance-none w-full text-gray-700 leading-tight focus:outline-none text-2xl", placeholder="Enter blog title") }}
+            </div>
+            <div class="mb-4">
+                <div id="drop-area" class="shadow appearance-none border rounded w-full py-2 px-0 text-gray-700 leading-tight focus:outline-none focus:shadow-outline flex items-center justify-center" style="height: 70px; border: 2px dashed #ccc;">
+                    <p class="text-center">
+                        Thêm ảnh đại diện cho bài viết<br>
+                        <span class="text-sm">hoặc kéo và thả</span>
+                    </p>
+                    {{ form.thumbnail_url(class="hidden", type="file", id="fileElem", required=True) }}
+                </div>
+                <input type="hidden" id="thumbnail_url" name="thumbnail_url" required>
+                <div id="thumbnail-error" class="text-red-500 text-sm hidden">Thumbnail image is required.</div>
+            </div>
+
+            <div class="mb-4">
+                <div id="editor" class="shadow appearance-none w-full py-2 px-2 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" style="height: 200px;">
+                </div>
+                <div id="toolbar-button" class="tooltip-save-button" style="position: absolute;">🛠️</div>
+
+                <input type="hidden" name="content" id="content">
+                <input type="file" id="image-upload" style="display: none;">
+            </div>
+            <div class="mb-4">
+                <button type="button" id="ConfirmButton" name="ConfirmButton">Đăng Bài</button>
+            </div>
+        </form>
+    </div>
+
+    <div id="categoryModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden2">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 class="text-xl mb-4">Chọn danh mục</h2>
+            <form id="categoryForm">
+                <div class="mb-4">
+                    {{ form.category_id(class="form-select mt-1 block w-full border-gray-300 rounded-lg text-lg py-2 px-0 focus:outline-none focus:ring-2 focus:ring-blue-500") }}
+                </div>
+                <div class="flex justify-end">
+                    <button type="button" id="cancelButton" class="mr-2 bg-gray-500 text-white px-4 py-2 rounded">Hủy</button>
+                    <button type="submit" id="submitButton" name="submitButton"class="bg-blue-500 text-white px-4 py-2 rounded">Xác nhận</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+   
+
+
+<style>
+    .hidden2 {
+        display: none;
+    }
+    .tooltip-save-button {
+        width: 24px; /* Đặt chiều rộng của icon */
+        height: 24px; /* Đặt chiều cao của icon */
+        display: flex; /* Sử dụng flexbox để căn giữa nội dung */
+        align-items: center; /* Căn giữa theo chiều dọc */
+        justify-content: center; /* Căn giữa theo chiều ngang */
+        font-size: 18px; /* Đặt kích thước font cho icon */
+        cursor: pointer; /* Thay đổi con trỏ chuột khi hover */
+        border: 1px solid #ccc; /* Đặt viền cho icon */
+        border-radius: 4px; /* Bo tròn các góc */
+        background-color: #f9f9f9; /* Đặt màu nền */
+    }
+
+    .tooltip-save-button:hover {
+        background-color: #e0e0e0; /* Đổi màu nền khi hover */
+    }    
+</style>
+
+<script src="https://unpkg.com/@popperjs/core@2"></script>
+<script src="https://unpkg.com/tippy.js@6"></script>
+<link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.bubble.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://unpkg.com/tippy.js@6/dist/tippy.css">
+<script src="https://unpkg.com/tippy.js@6/dist/tippy.umd.min.js"></script>
+<script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+<script src="{{ url_for('static', filename='js/blogs_user_forms.js') }}"></script>
+<script src="{{ url_for('static', filename='js/image-upload.js') }}"></script>
+
+<script>
+ // Khởi tạo Quill với theme 'bubble'
+ const quill = new Quill('#editor', {
+    theme: 'bubble',
+    placeholder: 'Viết nội dung bài viết ở đây...',
+    modules: {
+      toolbar: false  // Không hiển thị toolbar mặc định
+    }
+  });
+
+  const toolbarButton = document.getElementById('toolbar-button');
+
+  // Di chuyển nút toolbar-button khi người dùng click vào hàng nào đó
+  quill.on('selection-change', (range) => {
+    if (range) {
+      const bounds = quill.getBounds(range.index);  // Lấy vị trí hiện tại của vùng chọn
+      // Nếu vùng chọn hợp lệ
+      if (bounds) {
+        // Căn chỉnh nút theo vùng chọn và đặt nó ở bên trái của dòng hiện tại
+        toolbarButton.style.top = `${bounds.top + window.scrollY}px`;  // Thêm window.scrollY để tính toán chính xác hơn
+        toolbarButton.style.left = `${bounds.left - 40}px`;  // Đặt nút lệch trái
+        toolbarButton.style.display = 'block';  // Hiển thị nút
+      }
+    } else {
+      toolbarButton.style.display = 'none';  // Ẩn nút khi không có vùng chọn
+    }
+  });
+
+  // Tạo tooltip bằng Tippy.js
+  tippy('#toolbar-button', {
+    content: `<div class="toolbar-options">
+                <button class="ql-bold">B</button>
+                <button class="ql-italic">I</button>
+                <button class="ql-underline">U</button>
+              </div>`,
+    allowHTML: true,
+    trigger: 'click',  // Hiển thị khi bấm vào
+    interactive: true, // Cho phép tương tác với tooltip
+    onShow(instance) {
+      console.log('Tooltip hiển thị');
+    },
+    onHide(instance) {
+      console.log('Tooltip bị ẩn');
+    }
+  });
+
+  // Kết nối các nút định dạng với Quill
+  document.addEventListener('click', function(event) {
+    if (event.target.matches('.ql-bold')) {
+      quill.format('bold', true);
+    }
+    if (event.target.matches('.ql-italic')) {
+      quill.format('italic', true);
+    }
+    if (event.target.matches('.ql-underline')) {
+      quill.format('underline', true);
+    }
+  });
+  </script>
+
+{% endblock %}

@@ -8,6 +8,7 @@ class BlogForm(FlaskForm):
     title = StringField('Tiêu đề', validators=[DataRequired()])
     category_id = SelectField('Danh mục', choices=[], coerce=int, validators=[DataRequired()])
     content = TextAreaField('Nội dung', validators=[DataRequired()])
+    thumbnail_url = StringField('Ảnh Cover')
     user_id = HiddenField('User ID')
     submit = SubmitField('Đăng bài')
 
