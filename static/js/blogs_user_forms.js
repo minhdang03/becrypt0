@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 [{ 'header': ['1', '2', '3', '4', '5', '6', false] }],  // Chọn tiêu đề
                 ['bold', 'italic'],
                 [{ 'list': 'ordered'}, { 'list': 'bullet' }],     // Danh sách thứ tự và không thứ tự
-
+                ['image', 'clean']
             ]
         }
     });

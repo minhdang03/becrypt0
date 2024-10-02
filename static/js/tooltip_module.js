@@ -1,63 +1,66 @@
-// Khởi tạo Quill editor với Bubble theme
-const quill = new Quill('#editor', {
-    theme: 'bubble',
-    placeholder: 'Viết nội dung bài viết ở đây...',
-    modules: {
-      toolbar: false  // Không sử dụng toolbar mặc định
-    }
-  });
-  
-  // Xây dựng một module tùy chỉnh để xử lý tooltip
-  class CustomTooltipModule {
-    constructor(quill, options) {
-      this.quill = quill;
-      this.container = document.createElement('div');
-      this.container.classList.add('custom-tooltip');
-      this.container.style.display = 'none';
-      this.container.innerHTML = `
-        <button class="ql-bold">Bold</button>
-        <button class="ql-italic">Italic</button>
-        <button class="ql-underline">Underline</button>
-      `;
-      document.body.appendChild(this.container);
-  
-      this.quill.on('selection-change', (range) => {
+document.addEventListener('DOMContentLoaded', function() {
+    const toolbarButton = document.getElementById('toolbar-button');
+
+    // Sử dụng instance Quill đã được tạo từ blogs_user_forms.js
+    const quill = window.quill;
+
+    quill.on('selection-change', function(range, oldRange, source) {
         if (range) {
-          const bounds = this.quill.getBounds(range.index);
-          this.showTooltip(bounds);
+            if (range.length > 0) {
+                const bounds = quill.getBounds(range.index, range.length);
+                positionToolbarButton(bounds);
+            } else {
+                hideToolbarButton();
+            }
         } else {
-          this.hideTooltip();
+            hideToolbarButton();
         }
-      });
-  
-      // Bắt sự kiện từ các nút trong tooltip
-      this.container.querySelector('.ql-bold').addEventListener('click', () => {
-        this.quill.format('bold', true);
-      });
-      this.container.querySelector('.ql-italic').addEventListener('click', () => {
-        this.quill.format('italic', true);
-      });
-      this.container.querySelector('.ql-underline').addEventListener('click', () => {
-        this.quill.format('underline', true);
-      });
+    });
+
+    function positionToolbarButton(bounds) {
+        const editorRect = quill.container.getBoundingClientRect();
+        const buttonRect = toolbarButton.getBoundingClientRect();
+
+        const left = editorRect.left + bounds.left + (bounds.width / 2) - (buttonRect.width / 2);
+        const top = editorRect.top + bounds.top - buttonRect.height - 5;
+
+        toolbarButton.style.left = `${left}px`;
+        toolbarButton.style.top = `${top}px`;
+        toolbarButton.style.display = 'block';
     }
-  
-    showTooltip(bounds) {
-      this.container.style.top = `${bounds.top + window.scrollY}px`;
-      this.container.style.left = `${bounds.left + window.scrollX}px`;
-      this.container.style.display = 'block';
+
+    function hideToolbarButton() {
+        toolbarButton.style.display = 'none';
     }
-  
-    hideTooltip() {
-      this.container.style.display = 'none';
-    }
-  }
-  
-  // Đăng ký module tùy chỉnh
-  Quill.register('modules/customTooltip', CustomTooltipModule);
-  
-  // Khởi tạo module tooltip khi nhấn vào nút toolbar-button
-  document.getElementById('toolbar-button').addEventListener('click', () => {
-    quill.getModule('customTooltip').showTooltip({ top: 50, left: 100 });
-  });
-  
+
+    // Tạo tooltip bằng Tippy.js
+    tippy('#toolbar-button', {
+        content: `<div class="toolbar-options">
+                    <button class="ql-bold">B</button>
+                    <button class="ql-italic">I</button>
+                    <button class="ql-underline">U</button>
+                  </div>`,
+        allowHTML: true,
+        trigger: 'click',  // Hiển thị khi bấm vào
+        interactive: true, // Cho phép tương tác với tooltip
+        onShow(instance) {
+            console.log('Tooltip hiển thị');
+        },
+        onHide(instance) {
+            console.log('Tooltip bị ẩn');
+        }
+    });
+
+    // Kết nối các nút định dạng với Quill
+    document.addEventListener('click', function(event) {
+        if (event.target.matches('.ql-bold')) {
+            quill.format('bold', true);
+        }
+        if (event.target.matches('.ql-italic')) {
+            quill.format('italic', true);
+        }
+        if (event.target.matches('.ql-underline')) {
+            quill.format('underline', true);
+        }
+    });
+});

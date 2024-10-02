@@ -23,18 +23,29 @@
             </div>
 
             <div class="mb-4">
-                <div id="editor" class="shadow appearance-none w-full py-2 px-2 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" style="height: 200px;">
-                </div>
-                <div id="toolbar-button" class="tooltip-save-button" style="position: absolute;">🛠️</div>
 
+      
+            
+              <div id="editor" class=" appearance-none w-full py-2 px-2 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" style="height: 200px;">
+              </div>
+
+              <!-- Toolbar Button -->
+              <div id="toolbar-button" style="display: none; position: absolute;">
+                <!-- Nội dung của toolbar-button, ví dụ như SVG icon -->
+                <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#000000">
+                    <path d="M370-160v-260h-20q-78.85 0-134.43-55.61Q160-531.21 160-610.11q0-78.89 55.57-134.39Q271.15-800 350-800h370v60h-90v580h-60v-580H430v580h-60Z"/>
+                </svg>
+              </div>
+                
                 <input type="hidden" name="content" id="content">
                 <input type="file" id="image-upload" style="display: none;">
             </div>
             <div class="mb-4">
-                <button type="button" id="ConfirmButton" name="ConfirmButton">Đăng Bài</button>
-            </div>
+              <button type="button" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" id="ConfirmButton" name="ConfirmButton">Đăng Bài</button>            </div>
         </form>
-    </div>
+    </div>                
+    
+
 
     <div id="categoryModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden2">
         <div class="bg-white rounded-lg p-6 w-full max-w-md">
@@ -59,22 +70,21 @@
     .hidden2 {
         display: none;
     }
-    .tooltip-save-button {
-        width: 24px; /* Đặt chiều rộng của icon */
-        height: 24px; /* Đặt chiều cao của icon */
-        display: flex; /* Sử dụng flexbox để căn giữa nội dung */
-        align-items: center; /* Căn giữa theo chiều dọc */
-        justify-content: center; /* Căn giữa theo chiều ngang */
-        font-size: 18px; /* Đặt kích thước font cho icon */
-        cursor: pointer; /* Thay đổi con trỏ chuột khi hover */
-        border: 1px solid #ccc; /* Đặt viền cho icon */
-        border-radius: 4px; /* Bo tròn các góc */
-        background-color: #f9f9f9; /* Đặt màu nền */
-    }
+    .relative {
+  position: relative;
+}
 
-    .tooltip-save-button:hover {
-        background-color: #e0e0e0; /* Đổi màu nền khi hover */
-    }    
+#toolbar-button {
+  position: absolute;
+  z-index: 1000;
+  background-color: #333;
+  color: white;
+  padding: 5px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 5px;
+}
+
 </style>
 
 <script src="https://unpkg.com/@popperjs/core@2"></script>
@@ -87,65 +97,6 @@
 <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
 <script src="{{ url_for('static', filename='js/blogs_user_forms.js') }}"></script>
 <script src="{{ url_for('static', filename='js/image-upload.js') }}"></script>
-
-<script>
- // Khởi tạo Quill với theme 'bubble'
- const quill = new Quill('#editor', {
-    theme: 'bubble',
-    placeholder: 'Viết nội dung bài viết ở đây...',
-    modules: {
-      toolbar: false  // Không hiển thị toolbar mặc định
-    }
-  });
-
-  const toolbarButton = document.getElementById('toolbar-button');
-
-  // Di chuyển nút toolbar-button khi người dùng click vào hàng nào đó
-  quill.on('selection-change', (range) => {
-    if (range) {
-      const bounds = quill.getBounds(range.index);  // Lấy vị trí hiện tại của vùng chọn
-      // Nếu vùng chọn hợp lệ
-      if (bounds) {
-        // Căn chỉnh nút theo vùng chọn và đặt nó ở bên trái của dòng hiện tại
-        toolbarButton.style.top = `${bounds.top + window.scrollY}px`;  // Thêm window.scrollY để tính toán chính xác hơn
-        toolbarButton.style.left = `${bounds.left - 40}px`;  // Đặt nút lệch trái
-        toolbarButton.style.display = 'block';  // Hiển thị nút
-      }
-    } else {
-      toolbarButton.style.display = 'none';  // Ẩn nút khi không có vùng chọn
-    }
-  });
-
-  // Tạo tooltip bằng Tippy.js
-  tippy('#toolbar-button', {
-    content: `<div class="toolbar-options">
-                <button class="ql-bold">B</button>
-                <button class="ql-italic">I</button>
-                <button class="ql-underline">U</button>
-              </div>`,
-    allowHTML: true,
-    trigger: 'click',  // Hiển thị khi bấm vào
-    interactive: true, // Cho phép tương tác với tooltip
-    onShow(instance) {
-      console.log('Tooltip hiển thị');
-    },
-    onHide(instance) {
-      console.log('Tooltip bị ẩn');
-    }
-  });
-
-  // Kết nối các nút định dạng với Quill
-  document.addEventListener('click', function(event) {
-    if (event.target.matches('.ql-bold')) {
-      quill.format('bold', true);
-    }
-    if (event.target.matches('.ql-italic')) {
-      quill.format('italic', true);
-    }
-    if (event.target.matches('.ql-underline')) {
-      quill.format('underline', true);
-    }
-  });
-  </script>
+<script src="{{ url_for('static', filename='js/tooltip_module.js') }}"></script>
 
 {% endblock %}
